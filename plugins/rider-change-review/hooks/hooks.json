@@ -1,0 +1,19 @@
+{
+  "description": "Authorize apply_patch edits for Codex Change Viewer in Rider.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/hooks/authorize_apply_patch.py\"",
+            "commandWindows": "py -3 \"%PLUGIN_ROOT%\\hooks\\authorize_apply_patch.py\"",
+            "timeout": 5,
+            "statusMessage": "Authorizing Codex changes for Rider review"
+          }
+        ]
+      }
+    ]
+  }
+}

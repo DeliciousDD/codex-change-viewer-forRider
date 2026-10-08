@@ -1,0 +1,21 @@
+<idea-plugin>
+    <id>com.local.rider.codexviewer</id>
+    <name>Codex Change Viewer</name>
+    <version>0.3.5</version>
+    <vendor>Local</vendor>
+    <description><![CDATA[
+        Review only pre-authorized Codex workspace edits inline, by file, or with Rider's native Diff viewer.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.rider</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <postStartupActivity implementation="com.local.rider.codexviewer.startup.CodexChangeViewerStartupActivity"/>
+        <editorNotificationProvider implementation="com.local.rider.codexviewer.editor.CodexReviewEditorNotificationProvider"/>
+        <editorTabColorProvider implementation="com.local.rider.codexviewer.editor.CodexChangeTabColorProvider" order="first"/>
+        <toolWindow id="Codex Changes"
+                    anchor="right"
+                    factoryClass="com.local.rider.codexviewer.toolwindow.CodexChangesToolWindowFactory"/>
+    </extensions>
+</idea-plugin>

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#381076"/>
+      <stop offset="1" stop-color="#160833"/>
+    </linearGradient>
+    <linearGradient id="frame" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff39e8"/>
+      <stop offset="1" stop-color="#9a28ff"/>
+    </linearGradient>
+    <linearGradient id="review" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#4dffc6"/>
+      <stop offset="1" stop-color="#00b98c"/>
+    </linearGradient>
+  </defs>
+  <rect x="10" y="10" width="492" height="492" rx="112" fill="url(#bg)"/>
+  <rect x="73" y="92" width="366" height="328" rx="48" fill="#1d0c46" stroke="url(#frame)" stroke-width="24"/>
+  <path d="M120 152h272" stroke="#e72bdc" stroke-width="38" stroke-linecap="round"/>
+  <circle cx="132" cy="152" r="10" fill="#ffd5fb"/>
+  <circle cx="166" cy="152" r="10" fill="#ffd5fb"/>
+  <path d="M158 260l45 45-45 45M282 260l-45 45 45 45" fill="none" stroke="#ff56e9" stroke-width="25" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M341 206v188" stroke="url(#review)" stroke-width="24" stroke-linecap="round"/>
+  <path d="M377 238h32M377 282h32M377 326h32" stroke="#36e5b4" stroke-width="18" stroke-linecap="round"/>
+  <path d="M356 366l13 13 27-31" fill="none" stroke="#5cf8d1" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

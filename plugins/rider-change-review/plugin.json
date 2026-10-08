@@ -1,0 +1,33 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "rider-change-review",
+  "version": "0.3.5",
+  "description": "Authorize and review only Codex workspace edits in Codex Change Viewer for Rider.",
+  "author": {
+    "name": "DeliciousDD"
+  },
+  "homepage": "https://github.com/DeliciousDD/codex-change-viewer-forRider",
+  "repository": "https://github.com/DeliciousDD/codex-change-viewer-forRider",
+  "license": "MIT",
+  "keywords": ["codex", "rider", "code-review"],
+  "extensions": {
+    "com.openai": {
+      "hooks": "./hooks/hooks.json",
+      "interface": {
+        "displayName": "Codex Change Viewer",
+        "shortDescription": "Review Codex edits in Rider",
+        "longDescription": "Authorizes each Codex edit batch so Codex Change Viewer for Rider excludes third-party external changes while retaining inline review, Apply/Cancel actions, tab coloring, and native Diff.",
+        "developerName": "DeliciousDD",
+        "composerIcon": "./assets/logo-v2.png",
+        "logo": "./assets/logo-v2.png",
+        "category": "Developer Tools",
+        "capabilities": ["Interactive"],
+        "defaultPrompt": [
+          "Modify this project and authorize the changes for Codex Change Viewer in Rider.",
+          "Summarize the Codex changes I can review in Rider.",
+          "Help me verify that Codex Change Viewer will capture only my next Codex edit."
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "codex-change-viewer",
+  "interface": {
+    "displayName": "Codex Change Viewer Plugins"
+  },
+  "plugins": [
+    {
+      "name": "rider-change-review",
+      "source": {
+        "source": "local",
+        "path": "./plugins/rider-change-review"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+.gradle/
+.intellijPlatform/
+build/
+.idea/
+out/
+*.iml
+.codex-review.paths
+local.properties
