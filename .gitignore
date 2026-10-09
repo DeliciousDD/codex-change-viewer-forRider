@@ -5,4 +5,5 @@ build/
 out/
 *.iml
 .codex-review.paths
+.codex-review/
 local.properties

@@ -18,8 +18,8 @@ object LineDiff {
 
     fun compute(before: String, after: String): List<ChangeHunk> {
         if (before == after) return emptyList()
-        val oldLines = before.split('\n')
-        val newLines = after.split('\n')
+        val oldLines = if (before.isEmpty()) emptyList() else before.split('\n')
+        val newLines = if (after.isEmpty()) emptyList() else after.split('\n')
         var prefix = 0
         while (prefix < oldLines.size && prefix < newLines.size && oldLines[prefix] == newLines[prefix]) prefix++
 

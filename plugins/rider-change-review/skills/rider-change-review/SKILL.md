@@ -15,13 +15,21 @@ This skill intentionally contains no file-type classification, ignore-rule
 logic, settings pages, or ignore menus. The installed Codex Change Viewer Rider
 plugin watches only paths explicitly authorized by Codex, retains the first
 pre-change snapshot, lists changed files, opens Rider's native Diff viewer,
-and displays the same change blocks inline in the editor.
+and displays the same change blocks inline in the editor. Added files use an
+empty before-image and are reviewed like modified files.
 
-For `apply_patch` edits, the plugin's trusted `PreToolUse` hook extracts the
-patched paths and writes a short-lived marker immediately before the patch.
-For other edit mechanisms, Codex must write that marker itself before changing
-source files. Because normal third-party writes do not have that marker, they
-are not added to the Rider review queue.
+For `apply_patch` edits, the separately installed user `PreToolUse` Hook extracts
+the patched paths and atomically creates an immutable v2 batch under
+`.codex-review/batches/` immediately before the patch. Each batch contains a
+manifest and byte-for-byte before snapshots for existing files. Separate batch
+directories make concurrent Codex edits safe, and the snapshots remove the race
+between the Codex write and Rider's external-file refresh. Current Codex desktop
+builds do not automatically activate Hooks bundled only in a plugin, so the
+repository's `scripts/install-user-hook.ps1` must be run once. Ordinary external
+writers do not create these batches and are not added to the Rider review queue.
+The installer registers a user-level Hook under the current Codex home, so later
+Codex launches load it automatically; reinstall only when the packaged Hook is
+updated, removed, or used from a different user/Codex home.
 
 ## Workflow
 
@@ -29,14 +37,17 @@ are not added to the Rider review queue.
    for the request. Avoid writing generated output, dependency directories,
    IDE metadata, build artifacts, caches, and lock files unless the user
    explicitly asks; the Rider plugin may intentionally ignore those paths.
-2. For `apply_patch` edits, rely on the trusted bundled hook to write or replace
-   `.codex-review.paths` in the session's project root immediately before the
-   patch. The hook includes one exact project-relative path per patched file.
-   Do not create a second marker for the same patch.
+2. For `apply_patch` edits, rely on the user Hook installed by
+   `scripts/install-user-hook.ps1`. It creates one v2 batch with exact
+   project-relative paths and before snapshots. Do not create a second batch or
+   legacy marker when the Hook is known to be active.
 3. For edits made through a shell command, generator, or another mechanism,
-   create or replace `.codex-review.paths` in a separate workspace write before
-   changing source files. Include a comment header and one exact
-   project-relative path per line. Do not list the marker itself or use globs.
+   `apply_patch` is preferred because only it has automatic Codex attribution.
+   If such a write is unavoidable, create or replace the legacy
+   `.codex-review.paths` file in a separate workspace write before changing the
+   files. Include a comment header and one exact project-relative path per line.
+   Do not list the marker itself or use globs. This compatibility path does not
+   have the v2 protocol's durable before snapshots.
 4. Make only the requested edits in the listed project files. Prefer focused,
    coherent patches: smaller logical edits create clearer Rider diffs.
    Preserve existing line endings and avoid unrelated formatting rewrites.
@@ -58,7 +69,9 @@ the filesystem, it automatically opens each captured changed file (the last
 one becomes active); review the inline red/green
 code blocks. Each block has **应用** and **取消**; the editor header applies or
 cancels the whole file and also provides **应用全部文件** / **取消全部文件** for
-the current Codex review batch. The **Codex Changes** tool window also opens Rider's
+the current Codex review batch. It also shows the current/total change-block
+count with previous/next controls that move the caret and center the selected
+block. The **Codex Changes** tool window also opens Rider's
 built-in Diff, with the first pre-change snapshot on the left and current file
 content on the right. **不再显示** only removes an entry from that list.
 
@@ -66,15 +79,23 @@ content on the right. **不再显示** only removes an entry from that list.
 
 - This is coordination through shared workspace files, not a live remote-control
   connection to a running Rider instance.
-- The automatic marker hook runs only after the user has reviewed and trusted
-  its current definition. It covers `apply_patch`; use the explicit marker
-  workflow for shell-based or generated file changes.
-- The marker is a trusted coordination protocol, not operating-system process
-  attribution. Do not create or modify `.codex-review.paths` outside a Codex
-  change batch.
+- The automatic Hook runs only after `scripts/install-user-hook.ps1` has
+  installed it. Merely enabling the Codex plugin is insufficient on current
+  desktop builds. The installer preserves other user Hooks and runs an isolated
+  end-to-end self-test. It uses Windows PowerShell, does not require Python, and
+  copies a standalone uninstaller beside the installed Hook.
+- The v2 batch is trusted coordination data, not operating-system process
+  attribution. Do not create or modify `.codex-review/` outside a Codex change
+  batch. Rider removes fully observed batches and expires abandoned ones after
+  five minutes, which also prevents a failed Codex patch from authorizing a
+  later unrelated write indefinitely.
+- The Hook covers `apply_patch` directly and an `exec` call that wraps
+  `tools.apply_patch`; use the explicit legacy marker only for shell-based or
+  generated file changes.
 - Rider only tracks eligible external text-file updates in its current project;
   it excludes binary and oversized content.
 - Codex must edit the same directory Rider has opened. If Rider points at a
   different checkout/worktree, no review item will appear.
-- If a change does not appear, ask the user to refresh/synchronize the project
-  in Rider and verify the path is inside the opened project and below 4 MiB.
+- If a change does not appear, ask the user to refresh/synchronize the project,
+  verify that the same checkout is open in Rider, inspect
+  `.codex-review/last-hook-error.txt`, and verify the file is below 4 MiB.
