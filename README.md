@@ -7,9 +7,10 @@
 - Codex 修改后自动打开文件。
 - 在编辑器中显示行内代码差异。
 - 新增文件也会进入审阅，并以空文件作为修改前基线。
+- 删除和移动文件也会进入审阅；取消移动会恢复原路径，取消删除会恢复文件。
 - 每个文件显示“当前代码块/总代码块”以及上一块、下一块导航按钮。
 - 应用或取消单个代码块、整个文件或全部文件。
-- 待审阅文件显示绿色标签。
+- 待审阅文件显示彩色标签，并可在 Rider 设置中自定义颜色。
 - 使用 Rider 原生 Diff 查看完整差异。
 
 ## 安装前准备
@@ -48,9 +49,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $plugin.installed
 Hook self-test: passed
 ```
 
-然后完全退出并重新打开 Codex 或 ChatGPT 桌面应用。也可以在 **Plugins Directory → Codex Change Viewer Plugins** 中确认 **Codex Change Viewer** 已安装。
+然后完全退出并重新打开 Codex 或 ChatGPT 桌面应用。在 Codex 中运行一次 `/hooks`，检查并信任新安装的 `PreToolUse`、`PostToolUse` 定义；Codex 出于安全原因不会自动信任非托管 Hook。也可以在 **Plugins Directory → Codex Change Viewer Plugins** 中确认 **Codex Change Viewer** 已安装。
 
-安装脚本会备份并合并 `%USERPROFILE%\.codex\hooks.json`，不会覆盖其他 Hook。Hook 安装在当前 Windows 用户目录，使用系统自带 PowerShell，不依赖 Python。
+安装脚本会备份并合并 `%USERPROFILE%\.codex\hooks.json`，不会覆盖其他 Hook。它同时注册 `PreToolUse` 和 `PostToolUse`：执行前保存快照，执行成功后才确认该批次可供 Rider 审阅。Hook 安装在当前 Windows 用户目录，使用系统自带 PowerShell，不依赖 Python。
 
 ### Hook 是否需要每次启动时重新安装？
 
@@ -59,11 +60,13 @@ Hook self-test: passed
 - `%USERPROFILE%\.codex\hooks.json`
 - `%USERPROFILE%\.codex\hooks\rider-change-review\authorize_apply_patch.ps1`
 
-Codex 每次启动都会读取该用户配置。只有以下情况需要重新运行安装命令：
+Codex 每次启动都会读取该用户配置；完成一次信任后，普通重启不需要额外操作。只有以下情况需要重新运行安装命令：
 
 - 更新插件后需要同步新版 Hook；
 - Hook 被手动卸载或用户目录被清理；
 - 更换 Windows 用户，或使用了不同的 `CODEX_HOME`。
+
+如果 Hook 定义在升级时发生变化，Codex 会按新哈希要求重新信任。可运行 `/hooks` 查看状态；这不是弹窗，通常会在启动警告或 Hook 浏览器中显示。
 
 可以运行以下命令检查安装状态：
 
@@ -81,6 +84,10 @@ Test-Path "$env:USERPROFILE\.codex\hooks\rider-change-review\authorize_apply_pat
 3. Rider 会自动打开被修改的文件，并用绿色标签标记。
 4. 在行内代码块或编辑器顶部点击 **应用** / **取消**；也可以点击 **应用全部文件** / **取消全部文件**。
 5. 如需完整对比，打开 Rider 的 **Codex Changes** 工具窗口并查看 Diff。
+
+### 设置待审阅标签页颜色
+
+打开 **设置 → 工具 → Codex Change Viewer**，在“待审阅标签页颜色”中选择颜色并点击“应用”。已打开的待审阅标签页会立即刷新；“恢复默认”会重新选择默认绿色。
 
 ## 更新
 
@@ -118,28 +125,58 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.codex\hoo
 
 ### 第三方工具修改文件会进入审阅吗？
 
-不会。只有 Codex 的 `apply_patch` 工具在修改前创建的不可变批次才会进入审阅队列。每个批次都保存修改前快照；Rider 即使稍后才刷新，也能还原正确基线。普通编辑器、构建工具和其他程序不会创建这个批次。
+不会。Codex 的 `apply_patch` 工具会在修改前创建不可变快照，并在工具成功完成后写入确认标记；Rider 只消费已确认的批次。失败或未完成的工具调用不会进入审阅队列。普通编辑器、构建工具和其他程序不会创建这个批次。
+
+### 为什么保留 10 MiB 文件限制？
+
+这是 Rider 侧的单文件审阅安全上限，用于避免一次性读取、行级比较和渲染超大文本时占满内存或阻塞界面。直接删除限制会把风险转移到编辑器线程，因此当前版本保留该保护；超过上限的文件不会进入行内审阅。若以后需要支持大文件，更稳妥的方式是流式差异或只显示文件级提示，而不是无限制加载全文。
 
 ## 从源码构建 Rider 插件
 
-需要 JDK 25。首次构建会下载目标 Rider：
+### Windows 推荐构建方式
+
+仓库提供了稳定构建脚本，会自动使用本机 Rider 自带的 JBR、已缓存的 Gradle 与依赖，并避免 Gradle/Kotlin 后台进程的回环通信：
 
 ```powershell
-.\gradlew.bat buildPlugin
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-plugin.ps1
 ```
 
-如果本机已经安装 Rider，可避免下载：
+默认使用离线模式，执行 `test` 和 `buildPlugin`。也可以只编译 Kotlin：
 
 ```powershell
-.\gradlew.bat buildPlugin -PlocalRiderPath="C:\Program Files\JetBrains\JetBrains Rider 2026.2.1"
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-plugin.ps1 -Tasks compileKotlin
 ```
 
-安装包生成在 `build/distributions/`。
+多个任务既可以按 PowerShell 数组传入，也可以使用逗号分隔；脚本会统一拆分，避免 Gradle 把 `test,buildPlugin` 误认为一个任务名：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-plugin.ps1 -Tasks test,buildPlugin
+```
+
+如果是新机器、Gradle 或依赖尚未缓存，首次运行时增加 `-Online`：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-plugin.ps1 -Online
+```
+
+脚本只会在代理值明确等于 `http://127.0.0.1:9` 时，为当前构建进程忽略该不可用代理；不会修改系统或用户环境变量。安装包生成在 `build/distributions/`。
+
+在普通 PowerShell 中无需额外权限。若由 Codex 的受限执行环境首次联网下载，或访问用户目录下的 Gradle 缓存，需要在权限提示中允许该次构建；这是宿主沙箱的访问控制，不是 Gradle 配置问题。缓存准备完成后，日常构建使用默认离线命令即可。
+
+### 为什么以前会失败？
+
+这是两个相互独立的问题：
+
+1. 当前受限执行环境把 `HTTP_PROXY`、`HTTPS_PROXY` 和 `ALL_PROXY` 指向 `127.0.0.1:9`。该地址没有代理服务，Gradle Wrapper 和 Maven 仓库请求会等待到超时。增加 `networkTimeout` 只能延迟失败，不能恢复网络。默认离线构建完全绕过网络；首次下载则用 `-Online` 在允许联网的 PowerShell 中运行。
+2. `--no-daemon` 不保证绝不创建进程。如果 Gradle 客户端 JVM 的内存、区域设置或其他不可变参数与构建 JVM 不一致，Gradle 仍会启动 single-use Daemon。受限环境禁止它通过本机回环套接字连接，于是出现 `Unable to establish loopback connection`。构建脚本把客户端参数与 Gradle 默认构建参数对齐，并同时使用 `--no-daemon`、`--no-configuration-cache` 和 `kotlin.compiler.execution.strategy=in-process`，整个编译留在当前 JVM 中。
+
+相关说明见 Gradle 官方文档：[Daemon 与 single-use Daemon](https://docs.gradle.org/current/userguide/gradle_daemon.html)、[依赖离线模式](https://docs.gradle.org/current/userguide/dependency_caching.html#sec:offline-mode)、[Wrapper 网络配置](https://docs.gradle.org/current/userguide/gradle_wrapper.html)。
 
 ## 项目结构
 
 - `src/`：Rider 插件源码。
 - `plugins/rider-change-review/`：Codex 插件源码。
+- `scripts/build-plugin.ps1`：Windows 稳定构建入口。
 - `.agents/plugins/marketplace.json`：Codex Git marketplace 配置。
 
 ## License

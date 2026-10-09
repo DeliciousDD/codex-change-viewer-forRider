@@ -7,6 +7,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.fileTypes.PlainTextFileType
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.ScrollPaneFactory
@@ -38,21 +39,26 @@ class CodexChangesToolWindowFactory : ToolWindowFactory, DumbAware {
         val count = JLabel()
 
         fun refresh() {
-            val selectedPath = list.selectedValue?.file?.path
+            val selectedPath = list.selectedValue?.key
             model.clear()
             tracker.snapshot().forEach(model::addElement)
             list.selectedIndex = (0 until model.size).firstOrNull {
-                model.getElementAt(it).file.path == selectedPath
+                model.getElementAt(it).key == selectedPath
             } ?: -1
-            count.text = "${model.size} 个来自工作区的外部修改"
+            count.text = "${model.size} 个待审阅 Codex 修改"
         }
 
         val openDiff = JButton("查看差异").apply {
             addActionListener { list.selectedValue?.let { showDiff(project, it) } }
         }
-        val clearSelected = JButton("不再显示").apply {
+        val discardSelected = JButton("取消修改").apply {
             addActionListener { _ ->
-                list.selectedValue?.let { tracker.clear(it.file) }
+                list.selectedValue?.let(tracker::discard)
+            }
+        }
+        val acceptSelected = JButton("应用修改").apply {
+            addActionListener { _ ->
+                list.selectedValue?.let(tracker::accept)
             }
         }
         val clearAll = JButton("清空列表").apply {
@@ -61,7 +67,8 @@ class CodexChangesToolWindowFactory : ToolWindowFactory, DumbAware {
         list.addListSelectionListener {
             val hasSelection = list.selectedValue != null
             openDiff.isEnabled = hasSelection
-            clearSelected.isEnabled = hasSelection
+            discardSelected.isEnabled = hasSelection
+            acceptSelected.isEnabled = hasSelection
         }
 
         val panel = JPanel(BorderLayout(JBUI.scale(6), JBUI.scale(6))).apply {
@@ -70,7 +77,8 @@ class CodexChangesToolWindowFactory : ToolWindowFactory, DumbAware {
             add(ScrollPaneFactory.createScrollPane(list), BorderLayout.CENTER)
             add(JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(6), 0)).apply {
                 add(openDiff)
-                add(clearSelected)
+                add(discardSelected)
+                add(acceptSelected)
                 add(clearAll)
             }, BorderLayout.SOUTH)
         }
@@ -85,12 +93,13 @@ class CodexChangesToolWindowFactory : ToolWindowFactory, DumbAware {
 
     private fun showDiff(project: Project, entry: CodexChangeTrackerService.ReviewEntry) {
         val factory = DiffContentFactory.getInstance()
+        val fileType = entry.file?.fileType ?: PlainTextFileType.INSTANCE
         DiffManager.getInstance().showDiff(
             project,
             SimpleDiffRequest(
-                "Codex 修改：${entry.file.name}",
-                factory.create(entry.beforeText, entry.file.fileType),
-                factory.create(entry.afterText, entry.file.fileType),
+                "Codex 修改：${entry.displayPath}",
+                factory.create(entry.beforeText, fileType),
+                factory.create(project.service<CodexChangeTrackerService>().currentTextFor(entry), fileType),
                 "修改前",
                 "当前内容",
             ),

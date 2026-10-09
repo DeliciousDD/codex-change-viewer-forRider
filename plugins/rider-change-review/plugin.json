@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "rider-change-review",
-  "version": "0.4.2",
+  "version": "0.4.7",
   "description": "Authorize and review only Codex workspace edits in Codex Change Viewer for Rider.",
   "author": {
     "name": "DeliciousDD"

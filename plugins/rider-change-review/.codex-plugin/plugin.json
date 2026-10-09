@@ -18,7 +18,7 @@
     ]
   },
   "name": "rider-change-review",
-  "version": "0.4.2",
+  "version": "0.4.7",
   "description": "Authorize and review only Codex workspace edits in Codex Change Viewer for Rider.",
   "author": {
     "name": "DeliciousDD"

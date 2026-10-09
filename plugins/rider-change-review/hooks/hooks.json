@@ -2,11 +2,23 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "apply_patch|exec",
+        "matcher": "apply_patch|Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"${PLUGIN_ROOT}/hooks/authorize_apply_patch.ps1\"",
+            "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"${PLUGIN_ROOT}/hooks/authorize_apply_patch.ps1\" -Phase Pre",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "apply_patch|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"${PLUGIN_ROOT}/hooks/authorize_apply_patch.ps1\" -Phase Post",
             "timeout": 15
           }
         ]

@@ -27,16 +27,17 @@ import javax.swing.JPanel
 class CodexReviewEditorNotificationProvider : EditorNotificationProvider, DumbAware {
     override fun collectNotificationData(project: Project, file: VirtualFile): Function<in FileEditor, out JComponent?> = Function { fileEditor ->
         val tracker = project.service<CodexChangeTrackerService>()
+        val entry = tracker.changeFor(file)
         val hunks = tracker.hunks(file)
-        if (hunks.isEmpty()) null else JPanel(BorderLayout()).apply {
+        if (entry == null) null else JPanel(BorderLayout()).apply {
             border = JBUI.Borders.empty(5, 10)
-            add(JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(6), 0)).apply {
-                isOpaque = false
-                add(JLabel("Codex 产生 ${hunks.size} 个待审阅代码块"))
-                (fileEditor as? TextEditor)?.editor?.let { editor ->
-                    add(createHunkNavigator(editor, hunks))
-                }
-            }, BorderLayout.WEST)
+            val summary = when (entry.operation) {
+                CodexChangeTrackerService.ReviewOperation.CREATE -> "Codex 新增文件，${hunks.size} 个代码块待审阅"
+                CodexChangeTrackerService.ReviewOperation.DELETE -> "Codex 删除文件"
+                CodexChangeTrackerService.ReviewOperation.MOVE -> "Codex 移动文件，${hunks.size} 个代码块待审阅"
+                CodexChangeTrackerService.ReviewOperation.MODIFY -> "Codex 产生 ${hunks.size} 个待审阅代码块"
+            }
+            add(JLabel(summary), BorderLayout.WEST)
             add(JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(6), 0)).apply {
                 isOpaque = false
                 val discardAll = CompactColoredButton("取消全部文件", Color(128, 54, 60), 96)
@@ -51,12 +52,22 @@ class CodexReviewEditorNotificationProvider : EditorNotificationProvider, DumbAw
                 }
                 discardAll.addActionListener { _ -> disableAll(); tracker.discardAll() }
                 acceptAll.addActionListener { _ -> disableAll(); tracker.acceptAll() }
-                discard.addActionListener { _ -> discard.isEnabled = false; accept.isEnabled = false; tracker.discard(file) }
+                discard.addActionListener { _ ->
+                    discard.isEnabled = false
+                    accept.isEnabled = false
+                    if (!tracker.discard(file)) {
+                        discard.isEnabled = true
+                        accept.isEnabled = true
+                    }
+                }
                 accept.addActionListener { _ -> discard.isEnabled = false; accept.isEnabled = false; tracker.accept(file) }
                 add(discardAll)
                 add(acceptAll)
                 add(discard)
                 add(accept)
+                (fileEditor as? TextEditor)?.editor?.takeIf { hunks.isNotEmpty() }?.let { editor ->
+                    add(createHunkNavigator(editor, hunks))
+                }
             }, BorderLayout.EAST)
         }
     }
@@ -69,8 +80,8 @@ class CodexReviewEditorNotificationProvider : EditorNotificationProvider, DumbAw
 
         fun update() {
             position.text = "${currentIndex + 1}/${hunks.size}"
-            previous.isEnabled = currentIndex > 0
-            next.isEnabled = currentIndex < hunks.lastIndex
+            previous.isEnabled = hunks.size == 1 || currentIndex > 0
+            next.isEnabled = hunks.size == 1 || currentIndex < hunks.lastIndex
         }
 
         previous.addActionListener {
@@ -87,7 +98,7 @@ class CodexReviewEditorNotificationProvider : EditorNotificationProvider, DumbAw
 
         return JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(3), 0)).apply {
             isOpaque = false
-            border = JBUI.Borders.emptyLeft(4)
+            border = JBUI.Borders.emptyLeft(6)
             add(previous)
             add(position)
             add(next)

@@ -159,8 +159,22 @@ private class EditorDecoration(
         val height = editor.lineHeight.coerceAtMost(22)
         val discard = CompactColoredButton("取消", DISCARD_COLOR, 46, height)
         val accept = CompactColoredButton("应用", ACCEPT_COLOR, 46, height)
-        discard.addActionListener { _ -> discard.isEnabled = false; accept.isEnabled = false; tracker.discardHunk(file, hunk.key) }
-        accept.addActionListener { _ -> discard.isEnabled = false; accept.isEnabled = false; tracker.acceptHunk(file, hunk.key) }
+        discard.addActionListener { _ ->
+            discard.isEnabled = false
+            accept.isEnabled = false
+            if (!tracker.discardHunk(file, hunk.key)) {
+                discard.isEnabled = true
+                accept.isEnabled = true
+            }
+        }
+        accept.addActionListener { _ ->
+            discard.isEnabled = false
+            accept.isEnabled = false
+            if (!tracker.acceptHunk(file, hunk.key)) {
+                discard.isEnabled = true
+                accept.isEnabled = true
+            }
+        }
         panel.add(JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(6), 0)).apply { isOpaque = false; add(discard); add(accept) }, BorderLayout.EAST)
         return panel
     }

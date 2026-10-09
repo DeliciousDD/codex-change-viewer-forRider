@@ -11,6 +11,6 @@ class CodexChangeEntryRenderer : SimpleListCellRenderer<CodexChangeTrackerServic
         selected: Boolean,
         hasFocus: Boolean,
     ) {
-        text = value?.file?.presentableUrl ?: ""
+        text = value?.displayPath ?: ""
     }
 }
