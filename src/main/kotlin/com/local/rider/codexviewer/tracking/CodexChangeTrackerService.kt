@@ -19,6 +19,7 @@ import com.intellij.ui.EditorNotifications
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.local.rider.codexviewer.diff.ChangeHunk
 import com.local.rider.codexviewer.diff.LineDiff
+import com.local.rider.codexviewer.settings.CodexChangeViewerSettings
 import java.nio.charset.StandardCharsets
 import java.io.File
 import java.nio.file.Files
@@ -89,6 +90,14 @@ class CodexChangeTrackerService(private val project: Project) : Disposable {
     fun clearAll() {
         synchronized(lock) { entries.clear() }
         publish(null)
+    }
+
+    fun refreshIgnoredFiles() {
+        val ignored = snapshot().filter { CodexChangeViewerSettings.getInstance().isIgnoredFileName(it.relativePath) }
+        if (ignored.isNotEmpty()) {
+            synchronized(lock) { ignored.forEach { entries.remove(it.key) } }
+            publish(null)
+        }
     }
 
     /** Keep the current contents and finish reviewing this file. */
@@ -212,6 +221,8 @@ class CodexChangeTrackerService(private val project: Project) : Disposable {
     }
 
     private fun captureEntry(batch: BatchEntry) {
+        if (CodexChangeViewerSettings.getInstance().isIgnoredFileName(batch.relativePath) ||
+            CodexChangeViewerSettings.getInstance().isIgnoredFileName(batch.sourceRelativePath)) return
         val target = resolveWorkspacePath(batch.relativePath) ?: return
         val beforeBytes = if (batch.existed) {
             val snapshot = batch.beforeSnapshot ?: return

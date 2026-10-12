@@ -89,6 +89,10 @@ Test-Path "$env:USERPROFILE\.codex\hooks\rider-change-review\authorize_apply_pat
 
 打开 **设置 → 工具 → Codex Change Viewer**，在“待审阅标签页颜色”中选择颜色并点击“应用”。已打开的待审阅标签页会立即刷新；“恢复默认”会重新选择默认绿色。
 
+### 忽略文件类型
+
+同一设置页中的“忽略文件扩展名”可填写一个或多个扩展名，例如 `png, jpg, log`（可带或不带点号）。Codex 修改这些类型的文件时，Rider 不会创建待审阅项；修改设置并点击“应用”后，已经进入待审阅列表的匹配文件也会被移除。
+
 ## 更新
 
 更新 Rider 插件：从 [Releases](https://github.com/DeliciousDD/codex-change-viewer-forRider/releases) 下载最新 ZIP，再次从磁盘安装。
@@ -139,6 +143,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.codex\hoo
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-plugin.ps1
+```
+
+也可以使用专门生成 Rider 安装包的批处理入口。它只执行 `buildPlugin`，成功后会打印 ZIP 的完整路径；额外参数会透传给构建脚本：
+
+```bat
+.\scripts\build-rider-zip.bat
+```
+
+首次下载 Gradle 或 JetBrains 依赖时，在网络可用的普通 PowerShell 或 CMD 中运行：
+
+```bat
+.\scripts\build-rider-zip.bat -Online
 ```
 
 默认使用离线模式，执行 `test` 和 `buildPlugin`。也可以只编译 Kotlin：

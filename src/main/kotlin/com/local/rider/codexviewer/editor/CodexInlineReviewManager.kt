@@ -22,7 +22,6 @@ import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.ui.EditorTextField
 import com.intellij.util.Alarm
 import com.intellij.util.ui.JBUI
 import com.local.rider.codexviewer.diff.ChangeHunk
@@ -36,6 +35,7 @@ import java.util.IdentityHashMap
 import javax.swing.BorderFactory
 import javax.swing.JLabel
 import javax.swing.JPanel
+import javax.swing.JTextArea
 
 /** Shows pending Codex changes inline in a normal Rider editor. */
 @Service(Service.Level.PROJECT)
@@ -129,7 +129,12 @@ private class EditorDecoration(
         }
         val atEnd = hunk.newStartLine >= editor.document.lineCount
         val offset = if (atEnd) editor.document.textLength else editor.document.getLineStartOffset(hunk.newStartLine.coerceAtLeast(0))
-        val properties = InlayProperties().relatesToPrecedingText(true).showAbove(!atEnd)
+        // A pure deletion has no range in the current document. Anchor its removed-code block
+        // immediately before the next surviving line (or above EOF), rather than rendering it as
+        // a zero-height inline inlay after the final character.
+        val properties = InlayProperties()
+            .relatesToPrecedingText(hunk.oldLines.isEmpty())
+            .showAbove(hunk.oldLines.isNotEmpty() || !atEnd)
         editor.addComponentInlay(offset, properties, createHunkComponent(index, hunk), ComponentInlayAlignment.FIT_VIEWPORT_WIDTH)?.let(inlays::add)
     }
 
@@ -139,20 +144,24 @@ private class EditorDecoration(
         if (hunk.oldLines.isEmpty()) {
             panel.add(JLabel("+ 新增代码块").apply { border = JBUI.Borders.emptyLeft(3) }, BorderLayout.CENTER)
         } else {
-            val oldCode = EditorTextField(EditorFactory.getInstance().createDocument(hunk.oldLines.joinToString("\n")), editor.project, file.fileType, true, false).apply {
-                setViewer(true)
-                setOneLineMode(false)
-                setDisposedWith(this@EditorDecoration)
+            // A nested EditorTextField may receive a one-pixel preferred width inside a component
+            // inlay. That made deletion-only hunks count as changes but hide their removed lines.
+            // A regular non-editable text area has a stable preferred size and keeps the complete
+            // red removal block visible at the deletion anchor.
+            val oldCode = JTextArea(hunk.oldLines.joinToString("\n")).apply {
+                isEditable = false
+                isFocusable = false
+                isOpaque = true
                 this.background = background
-                border = BorderFactory.createEmptyBorder()
-                preferredSize = Dimension(1, this@EditorDecoration.editor.lineHeight * hunk.oldLines.size)
-                addSettingsProvider { embedded ->
-                    embedded.colorsScheme = this@EditorDecoration.editor.colorsScheme
-                    embedded.backgroundColor = background
-                    embedded.setHorizontalScrollbarVisible(false)
-                    embedded.setVerticalScrollbarVisible(false)
-                    embedded.settings.apply { isLineNumbersShown = false; isLineMarkerAreaShown = false; isFoldingOutlineShown = false; isRightMarginShown = false; isAdditionalPageAtBottom = false; additionalLinesCount = 0; additionalColumnsCount = 0 }
-                }
+                foreground = editor.colorsScheme.defaultForeground
+                font = editor.contentComponent.font
+                border = BorderFactory.createEmptyBorder(JBUI.scale(2), JBUI.scale(4), JBUI.scale(2), JBUI.scale(4))
+                lineWrap = false
+                wrapStyleWord = false
+                rows = hunk.oldLines.size.coerceAtLeast(1)
+                columns = 60
+                preferredSize = Dimension(JBUI.scale(360), editor.lineHeight * rows + JBUI.scale(4))
+                minimumSize = Dimension(JBUI.scale(80), preferredSize.height)
             }
             panel.add(oldCode, BorderLayout.CENTER)
         }
