@@ -22,6 +22,7 @@ import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.ui.EditorTextField
 import com.intellij.util.Alarm
 import com.intellij.util.ui.JBUI
 import com.local.rider.codexviewer.diff.ChangeHunk
@@ -35,7 +36,6 @@ import java.util.IdentityHashMap
 import javax.swing.BorderFactory
 import javax.swing.JLabel
 import javax.swing.JPanel
-import javax.swing.JTextArea
 
 /** Shows pending Codex changes inline in a normal Rider editor. */
 @Service(Service.Level.PROJECT)
@@ -140,28 +140,50 @@ private class EditorDecoration(
 
     private fun createHunkComponent(index: Int, hunk: ChangeHunk): JPanel {
         val background = blend(editor.colorsScheme.defaultBackground, REMOVED_TINT, 0.28f)
-        val panel = JPanel(BorderLayout()).apply { isOpaque = true; this.background = background; border = JBUI.Borders.empty() }
+        val panel = object : JPanel(BorderLayout()) {
+            override fun getPreferredSize(): Dimension {
+                val preferred = super.getPreferredSize()
+                return Dimension(maxOf(preferred.width, editor.scrollingModel.visibleArea.width), preferred.height)
+            }
+        }.apply {
+            isOpaque = true
+            this.background = background
+            border = JBUI.Borders.empty()
+        }
         if (hunk.oldLines.isEmpty()) {
             panel.add(JLabel("+ 新增代码块").apply { border = JBUI.Borders.emptyLeft(3) }, BorderLayout.CENTER)
         } else {
-            // A nested EditorTextField may receive a one-pixel preferred width inside a component
-            // inlay. That made deletion-only hunks count as changes but hide their removed lines.
-            // A regular non-editable text area has a stable preferred size and keeps the complete
-            // red removal block visible at the deletion anchor.
-            val oldCode = JTextArea(hunk.oldLines.joinToString("\n")).apply {
-                isEditable = false
-                isFocusable = false
-                isOpaque = true
+            // Use the same editor implementation and colour scheme as the live file so deleted
+            // code retains the exact font, font size, syntax styling and line height of additions.
+            val oldCode = EditorTextField(
+                EditorFactory.getInstance().createDocument(hunk.oldLines.joinToString("\n")),
+                editor.project,
+                file.fileType,
+                true,
+                false,
+            ).apply {
+                setViewer(true)
+                setOneLineMode(false)
+                setDisposedWith(this@EditorDecoration)
                 this.background = background
-                foreground = editor.colorsScheme.defaultForeground
-                font = editor.contentComponent.font
                 border = BorderFactory.createEmptyBorder(JBUI.scale(2), JBUI.scale(4), JBUI.scale(2), JBUI.scale(4))
-                lineWrap = false
-                wrapStyleWord = false
-                rows = hunk.oldLines.size.coerceAtLeast(1)
-                columns = 60
-                preferredSize = Dimension(JBUI.scale(360), editor.lineHeight * rows + JBUI.scale(4))
-                minimumSize = Dimension(JBUI.scale(80), preferredSize.height)
+                preferredSize = Dimension(0, this@EditorDecoration.editor.lineHeight * hunk.oldLines.size.coerceAtLeast(1) + JBUI.scale(4))
+                minimumSize = Dimension(0, preferredSize.height)
+                addSettingsProvider { embedded ->
+                    embedded.colorsScheme = this@EditorDecoration.editor.colorsScheme
+                    embedded.backgroundColor = background
+                    embedded.setHorizontalScrollbarVisible(false)
+                    embedded.setVerticalScrollbarVisible(false)
+                    embedded.settings.apply {
+                        isLineNumbersShown = false
+                        isLineMarkerAreaShown = false
+                        isFoldingOutlineShown = false
+                        isRightMarginShown = false
+                        isAdditionalPageAtBottom = false
+                        additionalLinesCount = 0
+                        additionalColumnsCount = 0
+                    }
+                }
             }
             panel.add(oldCode, BorderLayout.CENTER)
         }
